@@ -1,0 +1,159 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}EventHub — Discover Amazing Events{% endblock %}
+
+{% block body %}
+
+{# Hero #}
+<section class="hero text-white py-5">
+    <div class="container py-4 text-center position-relative">
+        <div class="mb-3">
+            <span class="badge rounded-pill px-4 py-2 mb-3 d-inline-block"
+                  style="background:rgba(255,255,255,.15);color:#e0e7ff;font-size:.85rem;backdrop-filter:blur(4px)">
+                <i class="bi bi-stars me-1"></i>Discover · Reserve · Experience
+            </span>
+        </div>
+        <h1 class="display-3 fw-black mb-3" style="letter-spacing:-1px;line-height:1.1">
+            Find Your Next<br>
+            <span style="background:linear-gradient(90deg,#a5b4fc,#f9a8d4);-webkit-background-clip:text;-webkit-text-fill-color:transparent">
+                Amazing Event
+            </span>
+        </h1>
+        <p class="lead mb-5 opacity-75 mx-auto" style="max-width:520px">
+            Browse hundreds of events, reserve your seat in seconds, and create unforgettable memories.
+        </p>
+
+        {# Quick search #}
+        <form action="{{ path('app_events') }}" method="GET" class="d-flex justify-content-center mb-4" data-turbo="false">
+            <div class="input-group shadow-lg" style="max-width:520px;border-radius:50px;overflow:hidden">
+                <span class="input-group-text bg-white border-0 ps-4">
+                    <i class="bi bi-search text-muted"></i>
+                </span>
+                <input type="text"
+                       name="q"
+                       class="form-control border-0 py-3"
+                       placeholder="Search events by name, location..."
+                       style="font-size:1rem">
+                <button class="btn btn-warning fw-bold px-4" type="submit" style="border-radius:0 50px 50px 0">
+                    Search
+                </button>
+            </div>
+        </form>
+
+        <div class="d-flex gap-3 justify-content-center flex-wrap">
+            <a href="{{ path('app_events') }}" class="btn btn-light btn-lg px-5 fw-bold shadow-sm">
+                <i class="bi bi-grid me-2"></i>Browse All Events
+            </a>
+        </div>
+    </div>
+</section>
+
+{# Stats bar #}
+<section class="bg-white border-bottom py-4 shadow-sm">
+    <div class="container">
+        <div class="row text-center g-0">
+            <div class="col-4 border-end">
+                <div class="fw-black fs-3 text-primary">{{ upcomingEvents|length }}+</div>
+                <div class="text-muted small fw-semibold">Upcoming Events</div>
+            </div>
+            <div class="col-4 border-end">
+                <div class="fw-black fs-3 text-success">Free</div>
+                <div class="text-muted small fw-semibold">Registration</div>
+            </div>
+            <div class="col-4">
+                <div class="fw-black fs-3 text-warning">100%</div>
+                <div class="text-muted small fw-semibold">Secure</div>
+            </div>
+        </div>
+    </div>
+</section>
+
+{# Upcoming events #}
+<section class="py-5">
+    <div class="container">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h2 class="fw-bold mb-1">
+                    <i class="bi bi-lightning-fill text-warning me-2"></i>Upcoming Events
+                </h2>
+                <p class="text-muted mb-0 small">Don't miss out — seats are limited</p>
+            </div>
+            <a href="{{ path('app_events') }}" class="btn btn-outline-primary fw-semibold">
+                View All <i class="bi bi-arrow-right ms-1"></i>
+            </a>
+        </div>
+
+        {% if upcomingEvents is empty %}
+            <div class="text-center py-5">
+                <i class="bi bi-calendar-x text-muted" style="font-size:3.5rem"></i>
+                <p class="text-muted mt-3">No upcoming events right now. Check back soon!</p>
+            </div>
+        {% else %}
+            <div class="row g-4">
+                {% for event in upcomingEvents %}
+                    <div class="col-sm-6 col-lg-4">
+                        <div class="card h-100 overflow-hidden">
+                            {% if event.image %}
+                                <img src="{{ asset('uploads/events/' ~ event.image) }}"
+                                     class="event-img w-100"
+                                     alt="{{ event.title }}">
+                            {% else %}
+                                <div class="event-img-placeholder"
+                                     style="background:linear-gradient(135deg,
+                                        {{ ['#6366f1','#8b5cf6','#ec4899','#f59e0b','#10b981','#3b82f6'][loop.index0 % 6] }},
+                                        {{ ['#4f46e5','#7c3aed','#db2777','#d97706','#059669','#2563eb'][loop.index0 % 6] }});">
+                                    <i class="bi bi-calendar-event text-white" style="font-size:3.5rem;opacity:.8"></i>
+                                </div>
+                            {% endif %}
+                            <div class="card-body d-flex flex-column p-4">
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <span class="badge bg-primary bg-opacity-10 text-primary rounded-pill px-3">
+                                        <i class="bi bi-geo-alt me-1"></i>{{ event.location }}
+                                    </span>
+                                    {% if event.availableSeats > 0 %}
+                                        <span class="badge badge-available rounded-pill px-3">{{ event.availableSeats }} left</span>
+                                    {% else %}
+                                        <span class="badge badge-full rounded-pill px-3">Sold Out</span>
+                                    {% endif %}
+                                </div>
+                                <h5 class="card-title fw-bold mb-2">{{ event.title }}</h5>
+                                <p class="card-text text-muted small flex-grow-1">
+                                    {{ event.description|slice(0, 95) }}{% if event.description|length > 95 %}…{% endif %}
+                                </p>
+                                <div class="text-muted small mb-3 mt-2">
+                                    <i class="bi bi-calendar3 me-1"></i>{{ event.date|date('M j, Y') }}
+                                    <span class="ms-3"><i class="bi bi-clock me-1"></i>{{ event.date|date('g:i A') }}</span>
+                                </div>
+                                <div class="d-flex gap-2">
+                                    <a href="{{ path('app_event_show', {id: event.id}) }}"
+                                       class="btn btn-outline-primary btn-sm flex-grow-1 fw-semibold">
+                                        <i class="bi bi-eye me-1"></i>Details
+                                    </a>
+                                    {% if event.availableSeats > 0 %}
+                                        <a href="{{ path('app_reserve', {id: event.id}) }}"
+                                           class="btn btn-primary btn-sm flex-grow-1 fw-semibold">
+                                            <i class="bi bi-ticket-perforated me-1"></i>Reserve
+                                        </a>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+    </div>
+</section>
+
+{# CTA banner #}
+<section class="py-5" style="background:linear-gradient(135deg,#1e1b4b,#4f46e5)">
+    <div class="container text-center text-white">
+        <h3 class="fw-bold mb-2">Ready to join an event?</h3>
+        <p class="opacity-75 mb-4">Browse our full catalog and secure your spot today — it's free.</p>
+        <a href="{{ path('app_events') }}" class="btn btn-light btn-lg px-5 fw-bold text-primary shadow">
+            <i class="bi bi-grid me-2"></i>See All Events
+        </a>
+    </div>
+</section>
+
+{% endblock %}

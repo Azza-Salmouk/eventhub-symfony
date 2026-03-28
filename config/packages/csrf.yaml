@@ -1,0 +1,8 @@
+# Session-based CSRF — remove data-controller so Stimulus does NOT intercept the token
+framework:
+    csrf_protection: true
+    form:
+        csrf_protection:
+            enabled: true
+            field_name: _token
+            field_attr: []

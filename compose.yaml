@@ -1,0 +1,88 @@
+services:
+
+  # ── PHP-FPM ──────────────────────────────────────────────────────────────────
+  php:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: eventhub_php
+    restart: unless-stopped
+    volumes:
+      - .:/var/www/html
+      # Named volume for var/ — prevents host from overwriting container permissions
+      - php_var:/var/www/html/var
+      - ./docker/php/opcache.ini:/usr/local/etc/php/conf.d/opcache.ini
+    environment:
+      APP_ENV: dev
+      APP_SECRET: "${APP_SECRET:-22970e61718b27a9333160edd5e63dfb}"
+      DATABASE_URL: "mysql://eventhub:eventhub_pass@mysql:3306/eventhub_db?serverVersion=8.0&charset=utf8mb4"
+      JWT_SECRET_KEY: "%kernel.project_dir%/config/jwt/private.pem"
+      JWT_PUBLIC_KEY: "%kernel.project_dir%/config/jwt/public.pem"
+      JWT_PASSPHRASE: "${JWT_PASSPHRASE:-d5a19149ecf743fabe272bb9aaf957f500aa2b8b29978543010b0f8a7f8efebb}"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - eventhub
+
+  # ── Nginx ─────────────────────────────────────────────────────────────────────
+  nginx:
+    image: nginx:1.25-alpine
+    container_name: eventhub_nginx
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    volumes:
+      - .:/var/www/html
+      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf
+    depends_on:
+      - php
+    networks:
+      - eventhub
+
+  # ── MySQL 8 ───────────────────────────────────────────────────────────────────
+  mysql:
+    image: mysql:8.0
+    container_name: eventhub_mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: root_pass
+      MYSQL_DATABASE: eventhub_db
+      MYSQL_USER: eventhub
+      MYSQL_PASSWORD: eventhub_pass
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-proot_pass"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks:
+      - eventhub
+
+  # ── phpMyAdmin ────────────────────────────────────────────────────────────────
+  phpmyadmin:
+    image: phpmyadmin:5
+    container_name: eventhub_phpmyadmin
+    restart: unless-stopped
+    ports:
+      - "8081:80"
+    environment:
+      PMA_HOST: mysql
+      PMA_USER: eventhub
+      PMA_PASSWORD: eventhub_pass
+    depends_on:
+      - mysql
+    networks:
+      - eventhub
+
+volumes:
+  mysql_data:
+  php_var:
+
+networks:
+  eventhub:
+    driver: bridge

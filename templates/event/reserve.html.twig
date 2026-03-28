@@ -1,0 +1,142 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Reserve — {{ event.title }}{% endblock %}
+
+{% block body %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-7 col-xl-6">
+
+            {# Breadcrumb #}
+            <nav aria-label="breadcrumb" class="mb-4">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{{ path('app_home') }}" class="text-decoration-none">Home</a></li>
+                    <li class="breadcrumb-item"><a href="{{ path('app_events') }}" class="text-decoration-none">Events</a></li>
+                    <li class="breadcrumb-item">
+                        <a href="{{ path('app_event_show', {id: event.id}) }}" class="text-decoration-none">{{ event.title|slice(0,30) }}…</a>
+                    </li>
+                    <li class="breadcrumb-item active">Reserve</li>
+                </ol>
+            </nav>
+
+            {# Event summary #}
+            <div class="card mb-4 border-0 shadow-sm" style="border-left:4px solid #6366f1 !important">
+                <div class="card-body d-flex gap-4 align-items-center p-4">
+                    {% if event.image %}
+                        <img src="{{ asset('uploads/events/' ~ event.image) }}"
+                             class="rounded-3 flex-shrink-0"
+                             style="width:80px;height:80px;object-fit:cover"
+                             alt="{{ event.title }}">
+                    {% else %}
+                        <div class="rounded-3 flex-shrink-0 d-flex align-items-center justify-content-center"
+                             style="width:80px;height:80px;background:linear-gradient(135deg,#6366f1,#8b5cf6)">
+                            <i class="bi bi-calendar-event text-white fs-3"></i>
+                        </div>
+                    {% endif %}
+                    <div class="flex-grow-1 min-w-0">
+                        <h5 class="mb-1 fw-bold text-truncate">{{ event.title }}</h5>
+                        <div class="text-muted small mb-2">
+                            <i class="bi bi-calendar3 me-1"></i>{{ event.date|date('M j, Y · g:i A') }}
+                            &nbsp;·&nbsp;
+                            <i class="bi bi-geo-alt me-1"></i>{{ event.location }}
+                        </div>
+                        <span class="badge badge-available rounded-pill px-3">
+                            <i class="bi bi-check-circle me-1"></i>{{ event.availableSeats }} seats available
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            {# Reservation form #}
+            <div class="card shadow border-0">
+                <div class="card-header py-3 px-4" style="background:linear-gradient(135deg,#6366f1,#4f46e5);border-radius:12px 12px 0 0">
+                    <h4 class="mb-0 text-white fw-bold">
+                        <i class="bi bi-ticket-perforated me-2"></i>Complete Your Reservation
+                    </h4>
+                </div>
+                <div class="card-body p-4">
+
+                    {{ form_start(form, {attr: {novalidate: 'novalidate', 'data-turbo': 'false'}}) }}
+
+                    {# Name field #}
+                    <div class="mb-4">
+                        <label class="form-label fw-semibold" for="{{ form.name.vars.id }}">
+                            <i class="bi bi-person me-1 text-primary"></i>{{ form.name.vars.label }}
+                            <span class="text-danger">*</span>
+                        </label>
+                        {{ form_widget(form.name, {
+                            attr: {
+                                class: 'form-control form-control-lg' ~ (form.name.vars.errors|length > 0 ? ' is-invalid' : ''),
+                                id: form.name.vars.id
+                            }
+                        }) }}
+                        {% if form.name.vars.errors|length > 0 %}
+                            <div class="invalid-feedback">
+                                {% for error in form.name.vars.errors %}{{ error.message }}{% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+
+                    {# Email field #}
+                    <div class="mb-4">
+                        <label class="form-label fw-semibold" for="{{ form.email.vars.id }}">
+                            <i class="bi bi-envelope me-1 text-primary"></i>{{ form.email.vars.label }}
+                            <span class="text-danger">*</span>
+                        </label>
+                        {{ form_widget(form.email, {
+                            attr: {
+                                class: 'form-control form-control-lg' ~ (form.email.vars.errors|length > 0 ? ' is-invalid' : ''),
+                                id: form.email.vars.id
+                            }
+                        }) }}
+                        {% if form.email.vars.errors|length > 0 %}
+                            <div class="invalid-feedback">
+                                {% for error in form.email.vars.errors %}{{ error.message }}{% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+
+                    {# Phone field #}
+                    <div class="mb-4">
+                        <label class="form-label fw-semibold" for="{{ form.phone.vars.id }}">
+                            <i class="bi bi-telephone me-1 text-primary"></i>{{ form.phone.vars.label }}
+                            <span class="text-danger">*</span>
+                        </label>
+                        {{ form_widget(form.phone, {
+                            attr: {
+                                class: 'form-control form-control-lg' ~ (form.phone.vars.errors|length > 0 ? ' is-invalid' : ''),
+                                id: form.phone.vars.id
+                            }
+                        }) }}
+                        {% if form.phone.vars.errors|length > 0 %}
+                            <div class="invalid-feedback">
+                                {% for error in form.phone.vars.errors %}{{ error.message }}{% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+
+                    <div class="alert alert-info border-0 d-flex gap-3 align-items-start mb-4" style="background:#eff6ff">
+                        <i class="bi bi-info-circle-fill text-primary mt-1 flex-shrink-0"></i>
+                        <div class="small">
+                            Reservation is <strong>free of charge</strong>. A confirmation will be shown immediately after submission.
+                        </div>
+                    </div>
+
+                    <div class="d-flex gap-3">
+                        <button type="submit" class="btn btn-primary btn-lg flex-grow-1 fw-bold shadow-sm">
+                            <i class="bi bi-check-circle me-2"></i>Confirm Reservation
+                        </button>
+                        <a href="{{ path('app_event_show', {id: event.id}) }}"
+                           class="btn btn-outline-secondary btn-lg px-4">
+                            Cancel
+                        </a>
+                    </div>
+
+                    {{ form_end(form) }}
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+{% endblock %}

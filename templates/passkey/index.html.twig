@@ -1,0 +1,229 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Passkey Authentication — EventHub{% endblock %}
+
+{% block body %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-7">
+
+            <div class="text-center mb-5">
+                <div class="d-inline-flex align-items-center justify-content-center rounded-3 mb-3 shadow"
+                     style="width:72px;height:72px;background:linear-gradient(135deg,#6366f1,#8b5cf6)">
+                    <i class="bi bi-fingerprint text-white" style="font-size:2rem"></i>
+                </div>
+                <h2 class="fw-bold mb-1">Passkey Authentication</h2>
+                <p class="text-muted">Admin-only — register or sign in with a hardware key, Face ID, or Touch ID.</p>
+            </div>
+
+            {# Alert area #}
+            <div id="passkeyAlert" class="d-none mb-4"></div>
+
+            <div class="row g-4">
+
+                {# Register card #}
+                <div class="col-md-6">
+                    <div class="card border-0 shadow-sm h-100">
+                        <div class="card-body p-4">
+                            <h5 class="fw-bold mb-1">
+                                <i class="bi bi-person-plus text-primary me-2"></i>Register Passkey
+                            </h5>
+                            <p class="text-muted small mb-4">Link a passkey to your admin account.</p>
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold" for="regUsername">Admin Username</label>
+                                <input type="text" id="regUsername" class="form-control"
+                                       placeholder="admin" autocomplete="username">
+                            </div>
+                            <button id="btnRegister" class="btn btn-primary w-100 fw-semibold">
+                                <i class="bi bi-fingerprint me-2"></i>Register Passkey
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                {# Login card #}
+                <div class="col-md-6">
+                    <div class="card border-0 shadow-sm h-100">
+                        <div class="card-body p-4">
+                            <h5 class="fw-bold mb-1">
+                                <i class="bi bi-box-arrow-in-right text-success me-2"></i>Sign In with Passkey
+                            </h5>
+                            <p class="text-muted small mb-4">Authenticate and receive a JWT token.</p>
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold" for="loginUsername">Admin Username</label>
+                                <input type="text" id="loginUsername" class="form-control"
+                                       placeholder="admin" autocomplete="username">
+                            </div>
+                            <button id="btnLogin" class="btn btn-success w-100 fw-semibold">
+                                <i class="bi bi-key me-2"></i>Sign In with Passkey
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {# JWT result #}
+            <div id="jwtResult" class="d-none mt-4">
+                <div class="card border-0 shadow-sm" style="border-left:4px solid #10b981 !important">
+                    <div class="card-body p-4">
+                        <h6 class="fw-bold text-success mb-2">
+                            <i class="bi bi-check-circle-fill me-2"></i>Authentication Successful — JWT Token
+                        </h6>
+                        <pre id="jwtToken" class="bg-light rounded p-3 small mb-0"
+                             style="word-break:break-all;white-space:pre-wrap"></pre>
+                        <button class="btn btn-sm btn-outline-secondary mt-2" onclick="copyToken()">
+                            <i class="bi bi-clipboard me-1"></i>Copy Token
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            {# How it works #}
+            <div class="card border-0 shadow-sm mt-4">
+                <div class="card-body p-4">
+                    <h6 class="fw-bold mb-3"><i class="bi bi-info-circle text-primary me-2"></i>How it works</h6>
+                    <ol class="small text-muted mb-0 ps-3">
+                        <li class="mb-2">Enter your admin username and click <strong>Register Passkey</strong> — your browser will prompt for biometric or hardware key.</li>
+                        <li class="mb-2">The credential is stored in the database linked to your account.</li>
+                        <li class="mb-2">Next time, click <strong>Sign In with Passkey</strong> — verify with your biometric and receive a JWT token.</li>
+                        <li>Use the JWT token in API requests: <code>Authorization: Bearer &lt;token&gt;</code></li>
+                    </ol>
+                </div>
+            </div>
+
+            <div class="text-center mt-4">
+                <a href="{{ path('app_login') }}" class="text-decoration-none text-muted small">
+                    <i class="bi bi-arrow-left me-1"></i>Back to classic login
+                </a>
+            </div>
+
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block javascripts %}
+{{ parent() }}
+<script>
+function showAlert(msg, type) {
+    const el = document.getElementById('passkeyAlert');
+    el.className = 'alert alert-' + type + ' border-0 d-flex gap-2 align-items-center';
+    el.innerHTML = '<i class="bi bi-' + (type === 'success' ? 'check-circle-fill' : 'exclamation-triangle-fill') + '"></i><div>' + msg + '</div>';
+}
+
+function copyToken() {
+    navigator.clipboard.writeText(document.getElementById('jwtToken').textContent);
+}
+
+// ── Registration ──────────────────────────────────────────────────────────────
+document.getElementById('btnRegister').addEventListener('click', async () => {
+    const username = document.getElementById('regUsername').value.trim();
+    if (!username) { showAlert('Please enter a username.', 'warning'); return; }
+
+    try {
+        // Step 1: get creation options from server
+        const optRes = await fetch('/api/passkey/register/options', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({username}),
+            credentials: 'include',
+        });
+        if (!optRes.ok) { const e = await optRes.json(); showAlert(e.error, 'danger'); return; }
+        const options = await optRes.json();
+
+        // Decode base64url fields required by the WebAuthn API
+        options.challenge = base64urlToBuffer(options.challenge);
+        options.user.id   = base64urlToBuffer(options.user.id);
+
+        // Step 2: browser prompts for authenticator
+        const credential = await navigator.credentials.create({publicKey: options});
+
+        // Step 3: send attestation response to server
+        const verRes = await fetch('/api/passkey/register/verify', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            credentials: 'include',
+            body: JSON.stringify({
+                id:                credential.id,
+                clientDataJSON:    bufferToBase64url(credential.response.clientDataJSON),
+                attestationObject: bufferToBase64url(credential.response.attestationObject),
+            }),
+        });
+        const result = await verRes.json();
+        if (verRes.ok) {
+            showAlert('Passkey registered successfully! You can now sign in.', 'success');
+        } else {
+            showAlert(result.error, 'danger');
+        }
+    } catch (err) {
+        showAlert('Registration failed: ' + err.message, 'danger');
+    }
+});
+
+// ── Authentication ────────────────────────────────────────────────────────────
+document.getElementById('btnLogin').addEventListener('click', async () => {
+    const username = document.getElementById('loginUsername').value.trim();
+    if (!username) { showAlert('Please enter a username.', 'warning'); return; }
+
+    try {
+        // Step 1: get assertion options from server
+        const optRes = await fetch('/api/passkey/login/options', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({username}),
+            credentials: 'include',
+        });
+        if (!optRes.ok) { const e = await optRes.json(); showAlert(e.error, 'danger'); return; }
+        const options = await optRes.json();
+
+        // Decode base64url fields required by the WebAuthn API
+        options.challenge = base64urlToBuffer(options.challenge);
+        options.allowCredentials = options.allowCredentials.map(c => ({
+            ...c,
+            id: base64urlToBuffer(c.id),
+        }));
+
+        // Step 2: browser prompts for authenticator
+        // FIX: variable is named `assertion` — was incorrectly referenced as `credential` before
+        const assertion = await navigator.credentials.get({publicKey: options});
+
+        // Step 3: send assertion response to server — use `assertion`, NOT `credential`
+        const verRes = await fetch('/api/passkey/login/verify', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            credentials: 'include',
+            body: JSON.stringify({
+                id:                assertion.id,                                          // FIX: was credential.id
+                clientDataJSON:    bufferToBase64url(assertion.response.clientDataJSON),
+                authenticatorData: bufferToBase64url(assertion.response.authenticatorData),
+                signature:         bufferToBase64url(assertion.response.signature),
+            }),
+        });
+        const result = await verRes.json();
+        if (verRes.ok && result.token) {
+            document.getElementById('jwtResult').classList.remove('d-none');
+            document.getElementById('jwtToken').textContent = result.token;
+            showAlert('Signed in as <strong>' + result.username + '</strong>!', 'success');
+        } else {
+            showAlert(result.error || 'Authentication failed', 'danger');
+        }
+    } catch (err) {
+        showAlert('Authentication failed: ' + err.message, 'danger');
+    }
+});
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function base64urlToBuffer(b64) {
+    // Pad to multiple of 4, convert base64url → base64, decode to ArrayBuffer
+    const padded = b64.replace(/-/g, '+').replace(/_/g, '/');
+    const bin    = atob(padded);
+    return Uint8Array.from(bin, c => c.charCodeAt(0)).buffer;
+}
+
+function bufferToBase64url(buf) {
+    // Convert ArrayBuffer → base64url string
+    return btoa(String.fromCharCode(...new Uint8Array(buf)))
+        .replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+}
+</script>
+{% endblock %}

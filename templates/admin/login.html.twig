@@ -1,0 +1,305 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Admin Login — EventHub{% endblock %}
+
+{% block body %}
+<div class="d-flex align-items-center justify-content-center py-5"
+     style="min-height:calc(100vh - 120px);background:linear-gradient(135deg,#0f0c29,#302b63,#24243e)">
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-sm-11 col-md-9 col-lg-7 col-xl-6">
+
+                {# Header #}
+                <div class="text-center mb-4">
+                    <div class="d-inline-flex align-items-center justify-content-center rounded-3 mb-3 shadow"
+                         style="width:64px;height:64px;background:linear-gradient(135deg,#6366f1,#8b5cf6)">
+                        <i class="bi bi-shield-lock text-white fs-3"></i>
+                    </div>
+                    <h3 class="text-white fw-bold mb-1">Admin Access</h3>
+                    <p class="mb-0" style="color:#a5b4fc;font-size:.9rem">Sign in with password or passkey</p>
+                </div>
+
+                {# Passkey alert area (JS-driven) #}
+                <div id="passkeyAlert" class="d-none mb-3"></div>
+
+                {# Tab switcher #}
+                <ul class="nav nav-pills mb-4 justify-content-center gap-2" id="loginTabs">
+                    <li class="nav-item">
+                        <button class="nav-link active px-4 fw-semibold" id="tab-password" data-tab="password">
+                            <i class="bi bi-lock me-1"></i>Password
+                        </button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="nav-link px-4 fw-semibold" id="tab-passkey" data-tab="passkey">
+                            <i class="bi bi-fingerprint me-1"></i>Passkey
+                        </button>
+                    </li>
+                </ul>
+
+                {# ── Password login panel ─────────────────────────────────── #}
+                <div id="panel-password">
+                    <div class="card border-0 shadow-lg" style="border-radius:16px">
+                        <div class="card-body p-4 p-sm-5">
+
+                            {% if error %}
+                                <div class="alert alert-danger border-0 d-flex gap-2 align-items-center mb-4"
+                                     style="border-radius:10px">
+                                    <i class="bi bi-exclamation-triangle-fill flex-shrink-0"></i>
+                                    <div>{{ error.messageKey|trans(error.messageData, 'security') }}</div>
+                                </div>
+                            {% endif %}
+
+                            <form method="post" action="{{ path('app_admin_login') }}"
+                                  novalidate data-turbo="false">
+                                <input type="hidden" name="_csrf_token"
+                                       value="{{ csrf_token('authenticate') }}">
+
+                                <div class="mb-4">
+                                    <label for="username" class="form-label fw-semibold">
+                                        <i class="bi bi-person me-1 text-primary"></i>Username
+                                    </label>
+                                    <input type="text" id="username" name="_username"
+                                           class="form-control form-control-lg"
+                                           value="{{ last_username }}"
+                                           placeholder="admin"
+                                           autocomplete="username" autofocus>
+                                </div>
+
+                                <div class="mb-4">
+                                    <label for="password" class="form-label fw-semibold">
+                                        <i class="bi bi-lock me-1 text-primary"></i>Password
+                                    </label>
+                                    <div class="input-group">
+                                        <input type="password" id="password" name="_password"
+                                               class="form-control form-control-lg border-end-0"
+                                               placeholder="Enter your password"
+                                               autocomplete="current-password">
+                                        <button class="btn btn-outline-secondary border-start-0"
+                                                type="button" id="togglePwd" tabindex="-1">
+                                            <i class="bi bi-eye" id="eyeIcon"></i>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div class="mb-4 form-check">
+                                    <input type="checkbox" class="form-check-input"
+                                           id="remember" name="_remember_me">
+                                    <label class="form-check-label text-muted" for="remember">
+                                        Remember me for 7 days
+                                    </label>
+                                </div>
+
+                                <button type="submit"
+                                        class="btn btn-primary btn-lg w-100 fw-bold shadow-sm">
+                                    <i class="bi bi-box-arrow-in-right me-2"></i>Sign In
+                                </button>
+                            </form>
+
+                        </div>
+                    </div>
+
+                    <div class="mt-3 p-3 rounded-3 text-center"
+                         style="background:rgba(255,255,255,.08)">
+                        <p class="mb-0 small" style="color:#a5b4fc">
+                            <i class="bi bi-info-circle me-1"></i>
+                            Demo: <code class="text-white">admin</code> /
+                            <code class="text-white">admin123</code>
+                        </p>
+                    </div>
+                </div>
+
+                {# ── Passkey login panel ───────────────────────────────────── #}
+                <div id="panel-passkey" class="d-none">
+                    <div class="card border-0 shadow-lg" style="border-radius:16px">
+                        <div class="card-body p-4 p-sm-5">
+
+                            <p class="text-muted small mb-4">
+                                Enter your admin username, then authenticate with your
+                                biometric or hardware key.
+                            </p>
+
+                            <div class="mb-4">
+                                <label for="pkUsername" class="form-label fw-semibold">
+                                    <i class="bi bi-person me-1 text-primary"></i>Admin Username
+                                </label>
+                                <input type="text" id="pkUsername" class="form-control form-control-lg"
+                                       placeholder="admin" autocomplete="username">
+                            </div>
+
+                            <div class="d-grid gap-3">
+                                <button id="btnPasskeyLogin"
+                                        class="btn btn-success btn-lg fw-bold shadow-sm">
+                                    <i class="bi bi-key me-2"></i>Sign In with Passkey
+                                </button>
+                                <button id="btnPasskeyRegister"
+                                        class="btn btn-outline-primary btn-lg fw-semibold">
+                                    <i class="bi bi-fingerprint me-2"></i>Register New Passkey
+                                </button>
+                            </div>
+
+                        </div>
+                    </div>
+
+                    <div class="mt-3 p-3 rounded-3 text-center"
+                         style="background:rgba(255,255,255,.08)">
+                        <p class="mb-0 small" style="color:#a5b4fc">
+                            <i class="bi bi-info-circle me-1"></i>
+                            After passkey verification you will be redirected to the admin dashboard.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="text-center mt-4">
+                    <a href="{{ path('app_home') }}"
+                       class="text-decoration-none"
+                       style="color:#a5b4fc;font-size:.9rem">
+                        <i class="bi bi-arrow-left me-1"></i>Back to Home
+                    </a>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block javascripts %}
+{{ parent() }}
+<script>
+// ── Tab switching ─────────────────────────────────────────────────────────────
+document.querySelectorAll('[data-tab]').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.querySelectorAll('[data-tab]').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        const tab = btn.dataset.tab;
+        document.getElementById('panel-password').classList.toggle('d-none', tab !== 'password');
+        document.getElementById('panel-passkey').classList.toggle('d-none', tab !== 'passkey');
+        document.getElementById('passkeyAlert').className = 'd-none mb-3';
+    });
+});
+
+// ── Alert helper ──────────────────────────────────────────────────────────────
+function showAlert(msg, type) {
+    const el = document.getElementById('passkeyAlert');
+    const icon = type === 'success' ? 'check-circle-fill'
+               : type === 'warning' ? 'exclamation-triangle-fill'
+               : 'x-circle-fill';
+    el.className = 'alert alert-' + type + ' border-0 d-flex gap-2 align-items-center mb-3';
+    el.innerHTML = '<i class="bi bi-' + icon + ' flex-shrink-0"></i><div>' + msg + '</div>';
+}
+
+function copyToken() {
+    navigator.clipboard.writeText(document.getElementById('jwtToken').textContent);
+}
+
+// ── Safe JSON fetch — never throws on non-JSON responses ─────────────────────
+async function apiFetch(url, body) {
+    const res = await fetch(url, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest'},
+        credentials: 'include',
+        body: JSON.stringify(body),
+    });
+    const contentType = res.headers.get('content-type') || '';
+    if (!contentType.includes('application/json')) {
+        // Server returned HTML (e.g. redirect) — surface a clear error
+        throw new Error('Server returned non-JSON response (HTTP ' + res.status + '). Check server logs.');
+    }
+    const data = await res.json();
+    return {ok: res.ok, status: res.status, data};
+}
+
+// ── Passkey Login ─────────────────────────────────────────────────────────────
+document.getElementById('btnPasskeyLogin').addEventListener('click', async () => {
+    const username = document.getElementById('pkUsername').value.trim();
+    if (!username) { showAlert('Please enter your admin username.', 'warning'); return; }
+
+    try {
+        // Step 1: get assertion options (web session endpoint)
+        const {ok, data: options} = await apiFetch('/passkey/login/options', {username});
+        if (!ok) { showAlert(options.error || 'Failed to get login options.', 'danger'); return; }
+
+        // Decode base64url → ArrayBuffer for WebAuthn API
+        options.challenge = base64urlToBuffer(options.challenge);
+        options.allowCredentials = (options.allowCredentials || []).map(c => ({
+            ...c, id: base64urlToBuffer(c.id),
+        }));
+
+        // Step 2: browser prompts authenticator
+        const assertion = await navigator.credentials.get({publicKey: options});
+
+        // Step 3: send assertion — web session endpoint creates Symfony session
+        const {ok: vOk, data: result} = await apiFetch('/passkey/login/verify', {
+            id:                assertion.id,
+            clientDataJSON:    bufferToBase64url(assertion.response.clientDataJSON),
+            authenticatorData: bufferToBase64url(assertion.response.authenticatorData),
+            signature:         bufferToBase64url(assertion.response.signature),
+        });
+
+        if (vOk && result.success) {
+            showAlert('Signed in as <strong>' + result.username + '</strong>! Redirecting…', 'success');
+            // Session is now set — redirect to admin dashboard
+            setTimeout(() => { window.location.href = result.redirectUrl; }, 800);
+        } else {
+            showAlert(result.error || 'Authentication failed.', 'danger');
+        }
+    } catch (err) {
+        console.error('Passkey login error:', err);
+        showAlert('Authentication failed: ' + err.message, 'danger');
+    }
+});
+
+// ── Passkey Register ──────────────────────────────────────────────────────────
+document.getElementById('btnPasskeyRegister').addEventListener('click', async () => {
+    const username = document.getElementById('pkUsername').value.trim();
+    if (!username) { showAlert('Please enter your admin username.', 'warning'); return; }
+
+    try {
+        // Step 1: get creation options
+        const {ok, data: options} = await apiFetch('/passkey-api/register/options', {username});
+        if (!ok) { showAlert(options.error || 'Failed to get registration options.', 'danger'); return; }
+
+        options.challenge = base64urlToBuffer(options.challenge);
+        options.user.id   = base64urlToBuffer(options.user.id);
+
+        // Step 2: browser prompts authenticator
+        const credential = await navigator.credentials.create({publicKey: options});
+
+        // Step 3: send attestation to server
+        const {ok: vOk, data: result} = await apiFetch('/passkey-api/register/verify', {
+            id:                credential.id,
+            clientDataJSON:    bufferToBase64url(credential.response.clientDataJSON),
+            attestationObject: bufferToBase64url(credential.response.attestationObject),
+        });
+
+        if (vOk) {
+            showAlert('Passkey registered! You can now sign in with it.', 'success');
+        } else {
+            showAlert(result.error || 'Registration failed.', 'danger');
+        }
+    } catch (err) {
+        console.error('Passkey register error:', err);
+        showAlert('Registration failed: ' + err.message, 'danger');
+    }
+});
+
+// ── Password toggle ───────────────────────────────────────────────────────────
+document.getElementById('togglePwd').addEventListener('click', function () {
+    const pwd  = document.getElementById('password');
+    const icon = document.getElementById('eyeIcon');
+    pwd.type   = pwd.type === 'password' ? 'text' : 'password';
+    icon.className = pwd.type === 'password' ? 'bi bi-eye' : 'bi bi-eye-slash';
+});
+
+// ── Base64url helpers ─────────────────────────────────────────────────────────
+function base64urlToBuffer(b64) {
+    const padded = b64.replace(/-/g, '+').replace(/_/g, '/');
+    const bin    = atob(padded);
+    return Uint8Array.from(bin, c => c.charCodeAt(0)).buffer;
+}
+function bufferToBase64url(buf) {
+    return btoa(String.fromCharCode(...new Uint8Array(buf)))
+        .replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+}
+</script>
+{% endblock %}

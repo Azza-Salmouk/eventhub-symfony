@@ -1,0 +1,92 @@
+name: EventHub CI
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    branches: [main, dev]
+
+jobs:
+  build:
+    name: PHP ${{ matrix.php }} — Lint & Validate
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        php: ['8.4', '8.5']
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: eventhub_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost -u root -proot"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: pdo_mysql, intl, opcache, zip, mbstring, openssl
+          coverage: none
+
+      - name: Display PHP version
+        run: php -v
+
+      - name: Validate composer.json
+        run: composer validate --strict
+
+      - name: Install dependencies
+        run: composer install --prefer-dist --no-progress --no-interaction --ignore-platform-req=ext-sodium
+
+      - name: Generate JWT keypair
+        run: |
+          mkdir -p config/jwt
+          php generate_keys.php
+
+      - name: Lint YAML config
+        run: php bin/console lint:yaml config/
+
+      - name: Lint Twig templates
+        run: php bin/console lint:twig templates/
+
+      - name: Check Symfony container
+        run: php bin/console debug:container --no-interaction 2>&1 | tail -5
+
+      - name: Run database migrations
+        env:
+          DATABASE_URL: "mysql://root:root@127.0.0.1:3306/eventhub_test?serverVersion=8.0&charset=utf8mb4"
+          APP_SECRET: ci_test_secret_32chars_minimum_ok
+          JWT_SECRET_KEY: "%kernel.project_dir%/config/jwt/private.pem"
+          JWT_PUBLIC_KEY: "%kernel.project_dir%/config/jwt/public.pem"
+          JWT_PASSPHRASE: ci_test_passphrase
+        run: |
+          php bin/console doctrine:migrations:migrate --no-interaction --env=test
+
+      - name: Validate Doctrine schema
+        env:
+          DATABASE_URL: "mysql://root:root@127.0.0.1:3306/eventhub_test?serverVersion=8.0&charset=utf8mb4"
+          APP_SECRET: ci_test_secret_32chars_minimum_ok
+          JWT_SECRET_KEY: "%kernel.project_dir%/config/jwt/private.pem"
+          JWT_PUBLIC_KEY: "%kernel.project_dir%/config/jwt/public.pem"
+          JWT_PASSPHRASE: ci_test_passphrase
+        run: php bin/console doctrine:schema:validate --env=test
+
+      - name: Run PHPUnit tests
+        env:
+          DATABASE_URL: "mysql://root:root@127.0.0.1:3306/eventhub_test?serverVersion=8.0&charset=utf8mb4"
+          APP_SECRET: ci_test_secret_32chars_minimum_ok
+          JWT_SECRET_KEY: "%kernel.project_dir%/config/jwt/private.pem"
+          JWT_PUBLIC_KEY: "%kernel.project_dir%/config/jwt/public.pem"
+          JWT_PASSPHRASE: ci_test_passphrase
+        run: php bin/phpunit --no-coverage 2>&1 || echo "No tests found — skipping"

@@ -1,0 +1,171 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}{{ event.title }} — EventHub{% endblock %}
+
+{% block body %}
+<div class="container py-5">
+
+    {# Breadcrumb #}
+    <nav aria-label="breadcrumb" class="mb-4">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{{ path('app_home') }}" class="text-decoration-none">Home</a></li>
+            <li class="breadcrumb-item"><a href="{{ path('app_events') }}" class="text-decoration-none">Events</a></li>
+            <li class="breadcrumb-item active text-truncate" style="max-width:200px">{{ event.title }}</li>
+        </ol>
+    </nav>
+
+    <div class="row g-5 align-items-start">
+
+        {# Left: Image #}
+        <div class="col-lg-6">
+            {% if event.image %}
+                <img src="{{ asset('uploads/events/' ~ event.image) }}"
+                     class="img-fluid rounded-3 shadow-lg w-100"
+                     style="max-height:460px;object-fit:cover"
+                     alt="{{ event.title }}">
+            {% else %}
+                <div class="rounded-3 shadow-lg d-flex align-items-center justify-content-center"
+                     style="height:460px;background:linear-gradient(135deg,#6366f1,#8b5cf6)">
+                    <i class="bi bi-calendar-event text-white" style="font-size:7rem;opacity:.7"></i>
+                </div>
+            {% endif %}
+
+            {# Reservations list preview (last 3) #}
+            {% if event.reservations|length > 0 %}
+                <div class="card mt-4 shadow-sm">
+                    <div class="card-body">
+                        <h6 class="fw-bold mb-3 text-muted">
+                            <i class="bi bi-people me-2"></i>Recent Attendees
+                        </h6>
+                        <div class="d-flex flex-wrap gap-2">
+                            {% for r in event.reservations|slice(0, 5) %}
+                                <span class="badge bg-primary bg-opacity-10 text-primary rounded-pill px-3 py-2">
+                                    {{ r.name }}
+                                </span>
+                            {% endfor %}
+                            {% if event.reservations|length > 5 %}
+                                <span class="badge bg-secondary bg-opacity-10 text-secondary rounded-pill px-3 py-2">
+                                    +{{ event.reservations|length - 5 }} more
+                                </span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+
+        {# Right: Info #}
+        <div class="col-lg-6">
+
+            {# Availability badge #}
+            {% if event.availableSeats > 0 %}
+                <span class="badge badge-available fs-6 px-3 py-2 rounded-pill mb-3 d-inline-block">
+                    <i class="bi bi-check-circle me-1"></i>{{ event.availableSeats }} seats available
+                </span>
+            {% else %}
+                <span class="badge badge-full fs-6 px-3 py-2 rounded-pill mb-3 d-inline-block">
+                    <i class="bi bi-x-circle me-1"></i>Fully Booked
+                </span>
+            {% endif %}
+
+            <h1 class="fw-bold mb-4" style="line-height:1.2">{{ event.title }}</h1>
+
+            {# Info grid #}
+            <div class="row g-3 mb-4">
+                <div class="col-6">
+                    <div class="card h-100 bg-primary bg-opacity-5 border-0 p-3">
+                        <div class="d-flex align-items-center gap-3">
+                            <div class="bg-primary bg-opacity-15 rounded-circle p-2 flex-shrink-0">
+                                <i class="bi bi-calendar3 text-primary fs-5"></i>
+                            </div>
+                            <div>
+                                <div class="text-muted" style="font-size:.7rem;text-transform:uppercase;letter-spacing:.05em">Date</div>
+                                <div class="fw-bold">{{ event.date|date('M j, Y') }}</div>
+                                <div class="text-muted small">{{ event.date|date('g:i A') }}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-6">
+                    <div class="card h-100 bg-success bg-opacity-5 border-0 p-3">
+                        <div class="d-flex align-items-center gap-3">
+                            <div class="bg-success bg-opacity-15 rounded-circle p-2 flex-shrink-0">
+                                <i class="bi bi-geo-alt text-success fs-5"></i>
+                            </div>
+                            <div>
+                                <div class="text-muted" style="font-size:.7rem;text-transform:uppercase;letter-spacing:.05em">Location</div>
+                                <div class="fw-bold">{{ event.location }}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-6">
+                    <div class="card h-100 bg-warning bg-opacity-5 border-0 p-3">
+                        <div class="d-flex align-items-center gap-3">
+                            <div class="bg-warning bg-opacity-15 rounded-circle p-2 flex-shrink-0">
+                                <i class="bi bi-people text-warning fs-5"></i>
+                            </div>
+                            <div>
+                                <div class="text-muted" style="font-size:.7rem;text-transform:uppercase;letter-spacing:.05em">Capacity</div>
+                                <div class="fw-bold">{{ event.seats }} seats</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-6">
+                    <div class="card h-100 bg-info bg-opacity-5 border-0 p-3">
+                        <div class="d-flex align-items-center gap-3">
+                            <div class="bg-info bg-opacity-15 rounded-circle p-2 flex-shrink-0">
+                                <i class="bi bi-ticket-perforated text-info fs-5"></i>
+                            </div>
+                            <div>
+                                <div class="text-muted" style="font-size:.7rem;text-transform:uppercase;letter-spacing:.05em">Reserved</div>
+                                <div class="fw-bold">{{ event.reservations|length }}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {# Availability progress bar #}
+            {% set pct = event.seats > 0 ? ((event.reservations|length / event.seats) * 100)|round : 0 %}
+            <div class="mb-4">
+                <div class="d-flex justify-content-between small mb-2">
+                    <span class="text-muted fw-semibold">Availability</span>
+                    <span class="fw-bold {{ pct > 80 ? 'text-danger' : (pct > 50 ? 'text-warning' : 'text-success') }}">
+                        {{ 100 - pct }}% available
+                    </span>
+                </div>
+                <div class="progress" style="height:10px;border-radius:99px">
+                    <div class="progress-bar {{ pct > 80 ? 'bg-danger' : (pct > 50 ? 'bg-warning' : 'bg-success') }}"
+                         style="width:{{ pct }}%;border-radius:99px;transition:width .6s ease"></div>
+                </div>
+            </div>
+
+            {# Description #}
+            <div class="mb-4">
+                <h5 class="fw-bold mb-2">About this event</h5>
+                <p class="text-muted lh-lg">{{ event.description }}</p>
+            </div>
+
+            {# CTA buttons #}
+            <div class="d-flex gap-3 flex-wrap">
+                {% if event.availableSeats > 0 %}
+                    <a href="{{ path('app_reserve', {id: event.id}) }}"
+                       class="btn btn-primary btn-lg px-5 fw-semibold shadow-sm">
+                        <i class="bi bi-ticket-perforated me-2"></i>Reserve a Seat
+                    </a>
+                {% else %}
+                    <button class="btn btn-secondary btn-lg px-5 fw-semibold" disabled>
+                        <i class="bi bi-x-circle me-2"></i>Fully Booked
+                    </button>
+                {% endif %}
+                <a href="{{ path('app_events') }}" class="btn btn-outline-secondary btn-lg">
+                    <i class="bi bi-arrow-left me-1"></i>All Events
+                </a>
+            </div>
+
+        </div>
+    </div>
+</div>
+{% endblock %}

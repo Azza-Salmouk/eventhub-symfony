@@ -1,0 +1,96 @@
+{% extends 'base.html.twig' %}
+
+{% block body %}
+<div class="d-flex" style="min-height:calc(100vh - 60px)">
+
+    {# Sidebar #}
+    <nav class="admin-sidebar d-none d-md-flex flex-column flex-shrink-0 p-3" style="width:240px">
+        <div class="text-white px-2 mb-4 mt-1">
+            <div class="d-flex align-items-center gap-2">
+                <div class="bg-primary rounded-2 d-flex align-items-center justify-content-center"
+                     style="width:36px;height:36px">
+                    <i class="bi bi-person-badge text-white"></i>
+                </div>
+                <div>
+                    <div class="fw-bold small text-white">{{ app.user.userIdentifier }}</div>
+                    <div style="font-size:.7rem;color:#a5b4fc">Administrator</div>
+                </div>
+            </div>
+        </div>
+
+        <div style="font-size:.65rem;text-transform:uppercase;letter-spacing:.1em;color:#6366f1;padding:0 .5rem;margin-bottom:.5rem">
+            Main Menu
+        </div>
+
+        <ul class="nav flex-column gap-1 mb-auto">
+            {% set route = app.request.attributes.get('_route') %}
+            <li class="nav-item">
+                <a class="nav-link {{ route == 'app_admin_dashboard' ? 'active' : '' }}"
+                   href="{{ path('app_admin_dashboard') }}">
+                    <i class="bi bi-speedometer2 me-2"></i>Dashboard
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link {{ route starts with 'app_admin_event' ? 'active' : '' }}"
+                   href="{{ path('app_admin_events') }}">
+                    <i class="bi bi-calendar-event me-2"></i>Events
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link {{ route == 'app_admin_reservations' ? 'active' : '' }}"
+                   href="{{ path('app_admin_reservations') }}">
+                    <i class="bi bi-ticket-perforated me-2"></i>Reservations
+                </a>
+            </li>
+        </ul>
+
+        <hr style="border-color:rgba(255,255,255,.1)">
+
+        <ul class="nav flex-column gap-1">
+            <li class="nav-item">
+                <a class="nav-link" href="{{ path('app_events') }}" target="_blank">
+                    <i class="bi bi-box-arrow-up-right me-2"></i>View Site
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="{{ path('app_logout') }}" style="color:#f87171">
+                    <i class="bi bi-box-arrow-right me-2"></i>Logout
+                </a>
+            </li>
+        </ul>
+    </nav>
+
+    {# Mobile sidebar toggle #}
+    <div class="d-md-none w-100 bg-dark px-3 py-2 d-flex align-items-center gap-3">
+        <button class="btn btn-sm btn-outline-light" type="button" data-bs-toggle="offcanvas" data-bs-target="#mobileSidebar">
+            <i class="bi bi-list"></i>
+        </button>
+        <span class="text-white fw-semibold small">Admin Panel</span>
+    </div>
+
+    {# Mobile offcanvas sidebar #}
+    <div class="offcanvas offcanvas-start bg-dark text-white" tabindex="-1" id="mobileSidebar" style="width:240px">
+        <div class="offcanvas-header border-bottom border-secondary">
+            <h6 class="offcanvas-title fw-bold">Admin Panel</h6>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas"></button>
+        </div>
+        <div class="offcanvas-body p-3">
+            {% set route = app.request.attributes.get('_route') %}
+            <ul class="nav flex-column gap-1">
+                <li><a class="nav-link text-white {{ route == 'app_admin_dashboard' ? 'bg-primary rounded' : '' }}" href="{{ path('app_admin_dashboard') }}"><i class="bi bi-speedometer2 me-2"></i>Dashboard</a></li>
+                <li><a class="nav-link text-white {{ route starts with 'app_admin_event' ? 'bg-primary rounded' : '' }}" href="{{ path('app_admin_events') }}"><i class="bi bi-calendar-event me-2"></i>Events</a></li>
+                <li><a class="nav-link text-white {{ route == 'app_admin_reservations' ? 'bg-primary rounded' : '' }}" href="{{ path('app_admin_reservations') }}"><i class="bi bi-ticket-perforated me-2"></i>Reservations</a></li>
+                <li><hr class="border-secondary"></li>
+                <li><a class="nav-link text-white" href="{{ path('app_events') }}" target="_blank"><i class="bi bi-box-arrow-up-right me-2"></i>View Site</a></li>
+                <li><a class="nav-link text-danger" href="{{ path('app_logout') }}"><i class="bi bi-box-arrow-right me-2"></i>Logout</a></li>
+            </ul>
+        </div>
+    </div>
+
+    {# Main content #}
+    <main class="flex-grow-1 p-4 overflow-auto">
+        {% block admin_content %}{% endblock %}
+    </main>
+
+</div>
+{% endblock %}

@@ -1,0 +1,5 @@
+# Turbo is installed but we use standard form submissions (not Turbo Drive)
+# check_header: false so CSRF tokens come from the session-based form field
+framework:
+    csrf_protection:
+        check_header: false
