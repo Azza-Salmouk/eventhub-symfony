@@ -6,10 +6,15 @@ use App\Entity\Event;
 use App\Form\EventType;
 use App\Repository\EventRepository;
 use App\Repository\ReservationRepository;
+use App\Service\ReservationMailer;
 use Doctrine\ORM\EntityManagerInterface;
+use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\Mailer\MailerInterface;
+use Symfony\Component\Mime\Address;
+use Symfony\Component\Mime\Email;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 use Symfony\Component\String\Slugger\SluggerInterface;
@@ -21,6 +26,9 @@ class AdminController extends AbstractController
     public function __construct(
         private EntityManagerInterface $em,
         private SluggerInterface $slugger,
+        private ReservationMailer $reservationMailer,
+        private LoggerInterface $logger,
+        private MailerInterface $mailer,
     ) {}
 
     #[Route('', name: 'app_admin_dashboard')]
@@ -32,6 +40,29 @@ class AdminController extends AbstractController
             'recentReservations' => $reservationRepo->findRecentWithEvent(5),
             'upcomingEvents'     => $eventRepo->findUpcoming(),
         ]);
+    }
+
+    #[Route('/debug/email-test', name: 'app_admin_debug_email', methods: ['GET'])]
+    public function debugEmailTest(Request $request): Response
+    {
+        $to = $request->query->get('to', $this->getUser()?->getUserIdentifier() . '@example.com');
+
+        try {
+            $email = (new Email())
+                ->from(new Address('noreply@eventhub.com', 'EventHub'))
+                ->to($to)
+                ->subject('EventHub — Admin Email Debug Test ' . date('H:i:s'))
+                ->html('<h2>EventHub Debug Email</h2><p>Sent at: ' . date('Y-m-d H:i:s') . '</p><p>If you see this, SMTP works!</p>');
+
+            $this->mailer->send($email);
+
+            $this->addFlash('success', '✅ Email sent to ' . $to . ' — check your inbox and var/log/mailer.log');
+        } catch (\Throwable $e) {
+            $this->addFlash('error', '❌ Email FAILED: ' . $e->getMessage() . ' — check var/log/mailer.log');
+            $this->logger->error('[AdminDebug] Email test failed: ' . $e->getMessage());
+        }
+
+        return $this->redirectToRoute('app_admin_dashboard');
     }
 
     // ─── Events CRUD ────────────────────────────────────────────────────────────
@@ -126,6 +157,34 @@ class AdminController extends AbstractController
             'events'       => $eventRepo->findBy([], ['title' => 'ASC']),
             'selectedEvent' => $eventId,
         ]);
+    }
+
+    #[Route('/reservations/{id}/resend-email', name: 'app_admin_reservation_resend_email', requirements: ['id' => '\d+'], methods: ['POST'])]
+    public function resendEmail(int $id, Request $request, ReservationRepository $reservationRepo): Response
+    {
+        $reservation = $reservationRepo->find($id);
+        if (!$reservation) {
+            throw $this->createNotFoundException('Reservation not found.');
+        }
+
+        if (!$this->isCsrfTokenValid('resend_email_' . $id, $request->request->get('_token'))) {
+            $this->addFlash('error', 'Invalid CSRF token.');
+            return $this->redirectToRoute('app_admin_reservations');
+        }
+
+        try {
+            $this->reservationMailer->sendConfirmation($reservation);
+            $this->addFlash('success', sprintf(
+                'Confirmation email resent to %s (%s).',
+                $reservation->getName(),
+                $reservation->getEmail()
+            ));
+        } catch (\Throwable $e) {
+            $this->logger->error('Failed to resend confirmation email: ' . $e->getMessage());
+            $this->addFlash('error', 'Failed to send email: ' . $e->getMessage());
+        }
+
+        return $this->redirectToRoute('app_admin_reservations');
     }
 
     // ─── Private helpers ────────────────────────────────────────────────────────

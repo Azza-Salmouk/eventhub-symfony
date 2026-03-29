@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reservation Confirmed</title>
+    <style>
+        body { margin: 0; padding: 0; background: #f1f5f9; font-family: 'Segoe UI', Arial, sans-serif; color: #1e293b; }
+        .wrapper { max-width: 600px; margin: 40px auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,.08); }
+        .header { background: linear-gradient(135deg, #0f0c29, #302b63, #6366f1); padding: 40px 32px; text-align: center; }
+        .header h1 { margin: 0; color: #ffffff; font-size: 1.6rem; font-weight: 800; letter-spacing: -.5px; }
+        .header p { margin: 8px 0 0; color: #a5b4fc; font-size: .95rem; }
+        .badge { display: inline-block; background: #10b981; color: #fff; border-radius: 99px; padding: 6px 20px; font-size: .85rem; font-weight: 700; margin-top: 16px; letter-spacing: .05em; text-transform: uppercase; }
+        .body { padding: 36px 32px; }
+        .greeting { font-size: 1.1rem; margin-bottom: 20px; }
+        .card { background: #f8fafc; border-radius: 10px; padding: 24px; margin: 24px 0; border-left: 4px solid #6366f1; }
+        .card-row { display: flex; gap: 12px; margin-bottom: 14px; align-items: flex-start; }
+        .card-row:last-child { margin-bottom: 0; }
+        .icon { width: 20px; text-align: center; color: #6366f1; font-size: 1rem; flex-shrink: 0; margin-top: 2px; }
+        .label { font-size: .75rem; text-transform: uppercase; letter-spacing: .06em; color: #94a3b8; font-weight: 600; margin-bottom: 2px; }
+        .value { font-size: .95rem; font-weight: 600; color: #1e293b; }
+        .cta { text-align: center; margin: 28px 0; }
+        .btn { display: inline-block; background: #6366f1; color: #ffffff; text-decoration: none; padding: 14px 36px; border-radius: 8px; font-weight: 700; font-size: .95rem; }
+        .footer { background: #f8fafc; padding: 24px 32px; text-align: center; border-top: 1px solid #e2e8f0; }
+        .footer p { margin: 0; font-size: .8rem; color: #94a3b8; }
+    </style>
+</head>
+<body>
+<div class="wrapper">
+
+    <div class="header">
+        <h1>🎫 EventHub</h1>
+        <p>Your reservation is confirmed</p>
+        <span class="badge">✓ Reservation Confirmed</span>
+    </div>
+
+    <div class="body">
+        <p class="greeting">Hello <strong>{{ reservation.name }}</strong>,</p>
+        <p>Great news! Your reservation has been successfully confirmed. Here are your booking details:</p>
+
+        <div class="card">
+            <div class="card-row">
+                <div class="icon">🎟</div>
+                <div>
+                    <div class="label">Event</div>
+                    <div class="value">{{ event.title }}</div>
+                </div>
+            </div>
+            <div class="card-row">
+                <div class="icon">📅</div>
+                <div>
+                    <div class="label">Date &amp; Time</div>
+                    <div class="value">{{ event.date|date('l, F j, Y · g:i A') }}</div>
+                </div>
+            </div>
+            <div class="card-row">
+                <div class="icon">📍</div>
+                <div>
+                    <div class="label">Location</div>
+                    <div class="value">{{ event.location }}</div>
+                </div>
+            </div>
+            <div class="card-row">
+                <div class="icon">👤</div>
+                <div>
+                    <div class="label">Attendee</div>
+                    <div class="value">{{ reservation.name }}</div>
+                </div>
+            </div>
+            <div class="card-row">
+                <div class="icon">📧</div>
+                <div>
+                    <div class="label">Email</div>
+                    <div class="value">{{ reservation.email }}</div>
+                </div>
+            </div>
+            <div class="card-row">
+                <div class="icon">📞</div>
+                <div>
+                    <div class="label">Phone</div>
+                    <div class="value">{{ reservation.phone }}</div>
+                </div>
+            </div>
+            <div class="card-row">
+                <div class="icon">🕐</div>
+                <div>
+                    <div class="label">Reserved On</div>
+                    <div class="value">{{ reservation.createdAt|date('M j, Y · g:i A') }}</div>
+                </div>
+            </div>
+        </div>
+
+        <p>Please keep this email as your confirmation. We look forward to seeing you at the event!</p>
+
+        <p style="margin-top:24px;color:#64748b;font-size:.9rem;">
+            If you have any questions, reply to this email or contact us at
+            <a href="mailto:contact@eventhub.com" style="color:#6366f1;">contact@eventhub.com</a>.
+        </p>
+    </div>
+
+    <div class="footer">
+        <p>&copy; {{ "now"|date("Y") }} EventHub. All rights reserved.</p>
+        <p style="margin-top:6px;">This is an automated confirmation email — please do not reply directly.</p>
+    </div>
+
+</div>
+</body>
+</html>

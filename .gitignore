@@ -22,3 +22,15 @@
 ###> lexik/jwt-authentication-bundle ###
 /config/jwt/*.pem
 ###< lexik/jwt-authentication-bundle ###
+
+# Extra safety — never commit these
+*.pem
+*.key
+*.p12
+*.pfx
+.env.local
+.env.prod
+.env.prod.local
+/generate_keys.php
+/check_schema.php
+/openssl_minimal.cnf

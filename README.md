@@ -413,6 +413,235 @@ curl -s -X POST http://localhost:8080/passkey-api/login/options \
 
 ---
 
+## Email Confirmation Setup
+
+After a successful reservation, EventHub automatically sends a confirmation email to the attendee containing their name, event title, date, and location.
+
+### How it works
+
+1. User submits the reservation form at `/events/{id}/reserve`
+2. After `$em->flush()`, `ReservationMailer::sendConfirmation()` is called
+3. A `TemplatedEmail` is built from `templates/emails/reservation_confirmation.html.twig`
+4. The email is dispatched via Symfony Mailer using `MAILER_DSN`
+5. All steps are logged — check `var/log/dev.log` for `[ReservationMailer]` entries
+6. In dev mode, if `MAILER_DSN=null://null`, a **yellow warning flash** is shown on the page
+
+---
+
+### Step 1 — Diagnose your current config
+
+```bash
+# Local
+php bin/console app:debug-mailer
+
+# Docker
+docker exec eventhub_php php bin/console app:debug-mailer
+```
+
+Example output with `null://null`:
+```
+EventHub — Mailer Diagnostic
+ ─────────────────────────────────────────────────────
+  Symfony environment   dev
+  MAILER_DSN            null://null
+  Transport type        null (discard)
+  Emails will be sent   ❌ NO (null transport)
+
+ [WARNING] MAILER_DSN is null://null — all emails are silently discarded.
+           To enable real email delivery:
+             1. Create .env.local (never commit it)
+             2. Add: MAILER_DSN=smtp://user:pass@sandbox.smtp.mailtrap.io:2525?encryption=tls
+             3. Restart the container: docker compose restart php
+             4. Test: php bin/console app:test-email your@email.com
+```
+
+---
+
+### Step 2 — Configure Mailtrap (recommended for dev)
+
+1. Create a free account at [mailtrap.io](https://mailtrap.io)
+2. Go to **Email Testing → Inboxes → your inbox → SMTP Settings**
+3. Select **Symfony** from the integrations dropdown — it shows the exact DSN
+4. Create `.env.local` in the project root:
+
+```dotenv
+# .env.local — NEVER commit this file (it is in .gitignore)
+MAILER_DSN=smtp://YOUR_USER:YOUR_PASS@sandbox.smtp.mailtrap.io:2525?encryption=tls
+```
+
+5. Restart the PHP container:
+```bash
+docker compose restart php
+```
+
+6. Verify the DSN is loaded:
+```bash
+docker exec eventhub_php php bin/console app:debug-mailer
+# Expected: Transport type → Mailtrap SMTP, Emails will be sent → ✅ YES
+```
+
+7. Send a test email:
+```bash
+docker exec eventhub_php php bin/console app:test-email your@email.com
+# Expected: [OK] Email sent successfully to your@email.com
+```
+
+8. Check your Mailtrap inbox — the email should appear within seconds.
+
+---
+
+### Step 3 — Configure Gmail SMTP (alternative)
+
+1. Enable **2-Step Verification** on your Google Account
+2. Go to **Google Account → Security → App Passwords**
+3. Generate an App Password for "Mail"
+4. Add to `.env.local`:
+
+```dotenv
+MAILER_DSN=smtp://your.email@gmail.com:APP_PASSWORD_HERE@smtp.gmail.com:587?encryption=tls
+```
+
+5. Restart and test:
+```bash
+docker compose restart php
+docker exec eventhub_php php bin/console app:test-email your@email.com
+```
+
+---
+
+### Step 4 — Inject MAILER_DSN in Docker without rebuilding
+
+You can override `MAILER_DSN` at runtime without touching any file:
+
+```bash
+# Option A: pass as shell env var before docker compose
+MAILER_DSN="smtp://user:pass@sandbox.smtp.mailtrap.io:2525?encryption=tls" \
+  docker compose up -d
+
+# Option B: create a .env file at the project root (Docker reads it automatically)
+echo 'MAILER_DSN=smtp://user:pass@sandbox.smtp.mailtrap.io:2525?encryption=tls' >> .env.local
+
+# Option C: restart only the php service after updating .env.local
+docker compose restart php
+
+# Verify the var is injected
+docker compose exec php printenv MAILER_DSN
+```
+
+---
+
+### Step 5 — Test the full reservation flow
+
+```bash
+# 1. Make sure MAILER_DSN is set to Mailtrap
+docker exec eventhub_php php bin/console app:debug-mailer
+
+# 2. Send a standalone test email
+docker exec eventhub_php php bin/console app:test-email your@email.com
+
+# 3. Watch logs while making a reservation in the browser
+docker exec eventhub_php tail -f var/log/dev.log | grep -E "Mailer|email|reservation"
+```
+
+Expected log lines on success:
+```
+[info] [EventController] Sending reservation confirmation email {"reservation_id":1,"to":"alice@example.com","event":"Tech Summit 2026"}
+[info] [ReservationMailer] Preparing confirmation email {"to":"alice@example.com","name":"Alice","event":"Tech Summit 2026"}
+[info] [ReservationMailer] Confirmation email sent successfully {"to":"alice@example.com","reservation_id":1}
+[info] [EventController] Confirmation email dispatched OK {"reservation_id":1}
+```
+
+---
+
+### Admin: Resend confirmation email
+
+In the admin reservations list (`/admin/reservations`), each row has a **Resend** button that re-sends the confirmation email to the attendee. The action is CSRF-protected.
+
+---
+
+### Security — no secrets in Git
+
+- `.env` contains only `MAILER_DSN=null://null` (safe placeholder)
+- Real credentials go in `.env.local` which is in `.gitignore`
+- JWT private keys (`config/jwt/*.pem`) are also in `.gitignore`
+- Never commit `.env.local` or any file containing real passwords/tokens
+
+### GitGuardian alert remediation
+
+If JWT keys or secrets were previously committed:
+```bash
+# 1. Regenerate JWT keys immediately
+php generate_keys.php
+
+# 2. Remove sensitive files from git history
+git filter-repo --path config/jwt/private.pem --invert-paths
+git filter-repo --path config/jwt/public.pem --invert-paths
+
+# 3. Force-push to all branches
+git push --force --all
+
+# 4. Verify .gitignore covers the files
+git check-ignore -v config/jwt/private.pem
+# Expected output: .gitignore:XX:/config/jwt/*.pem
+```
+
+---
+
+## Security Notes
+
+### Never commit secrets to Git
+
+This project follows the Symfony best practice of keeping secrets out of version control.
+
+| File | Committed? | Purpose |
+|---|---|---|
+| `.env` | ✅ Yes | Safe defaults and placeholders only — no real passwords |
+| `.env.example` | ✅ Yes | Template showing all required variables |
+| `.env.local` | ❌ No (gitignored) | Your real secrets — Gmail, JWT passphrase, APP_SECRET |
+| `config/jwt/*.pem` | ❌ No (gitignored) | RSA private/public keys |
+| `var/` | ❌ No (gitignored) | Cache, logs, sessions |
+
+### Setup for a new developer
+
+```bash
+# 1. Copy the example file
+cp .env.example .env.local
+
+# 2. Fill in your real values in .env.local
+#    - APP_SECRET: php -r "echo bin2hex(random_bytes(16));"
+#    - MAILER_DSN: your Gmail App Password or Mailtrap DSN
+#    - JWT_PASSPHRASE: any strong random string
+
+# 3. Generate JWT keys
+php generate_keys.php
+
+# 4. Never commit .env.local or config/jwt/*.pem
+git check-ignore -v .env.local config/jwt/private.pem
+```
+
+### If a secret was accidentally committed
+
+```bash
+# 1. Immediately revoke the exposed secret:
+#    - Gmail App Password: Google Account → Security → App Passwords → Delete
+#    - JWT keys: php generate_keys.php (regenerates with new passphrase)
+#    - APP_SECRET: generate new one, update .env.local
+
+# 2. Remove from git history (requires git-filter-repo):
+pip install git-filter-repo
+git filter-repo --path .env --invert-paths
+git filter-repo --path config/jwt/private.pem --invert-paths
+
+# 3. Force push all branches
+git push --force --all
+git push --force --tags
+
+# 4. Verify the file is now ignored
+git check-ignore -v .env.local
+```
+
+---
+
 ## Running Tests
 
 ```bash

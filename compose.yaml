@@ -7,18 +7,28 @@ services:
       dockerfile: Dockerfile
     container_name: eventhub_php
     restart: unless-stopped
+    # No user override — container starts as root so entrypoint can chown,
+    # then su-exec drops to www-data before starting php-fpm.
     volumes:
+      # Source code (read-only for php-fpm after entrypoint runs)
       - .:/var/www/html
-      # Named volume for var/ — prevents host from overwriting container permissions
+      # Named volumes for directories that need Linux permissions.
+      # These are NOT bind-mounted from Windows, so NTFS never interferes.
       - php_var:/var/www/html/var
-      - ./docker/php/opcache.ini:/usr/local/etc/php/conf.d/opcache.ini
+      - php_uploads:/var/www/html/public/uploads
+      - ./docker/php/opcache.ini:/usr/local/etc/php/conf.d/opcache.ini:ro
     environment:
-      APP_ENV: dev
+      APP_ENV: "${APP_ENV:-dev}"
       APP_SECRET: "${APP_SECRET:-22970e61718b27a9333160edd5e63dfb}"
       DATABASE_URL: "mysql://eventhub:eventhub_pass@mysql:3306/eventhub_db?serverVersion=8.0&charset=utf8mb4"
       JWT_SECRET_KEY: "%kernel.project_dir%/config/jwt/private.pem"
       JWT_PUBLIC_KEY: "%kernel.project_dir%/config/jwt/public.pem"
       JWT_PASSPHRASE: "${JWT_PASSPHRASE:-d5a19149ecf743fabe272bb9aaf957f500aa2b8b29978543010b0f8a7f8efebb}"
+      # MAILER — reads from .env.local (gitignored) or host environment.
+      # Set real credentials in .env.local, never in .env.
+      MAILER_DSN: "${MAILER_DSN:-null://null}"
+      MAILER_FROM_EMAIL: "${MAILER_FROM_EMAIL:-noreply@eventhub.com}"
+      MAILER_FROM_NAME: "${MAILER_FROM_NAME:-EventHub}"
     depends_on:
       mysql:
         condition: service_healthy
@@ -33,8 +43,9 @@ services:
     ports:
       - "8080:80"
     volumes:
-      - .:/var/www/html
-      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf
+      - .:/var/www/html:ro
+      - php_uploads:/var/www/html/public/uploads:ro
+      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
     depends_on:
       - php
     networks:
@@ -63,6 +74,19 @@ services:
     networks:
       - eventhub
 
+  # ── Mailpit (local email testing — no real SMTP needed) ─────────────────────
+  # Access inbox at http://localhost:8025
+  # To use: set MAILER_DSN=smtp://mailpit:1025 in .env
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: eventhub_mailpit
+    restart: unless-stopped
+    ports:
+      - "8025:8025"   # Web UI
+      - "1025:1025"   # SMTP
+    networks:
+      - eventhub
+
   # ── phpMyAdmin ────────────────────────────────────────────────────────────────
   phpmyadmin:
     image: phpmyadmin:5
@@ -81,7 +105,10 @@ services:
 
 volumes:
   mysql_data:
+  # php_var and php_uploads are named Docker volumes (not NTFS bind-mounts).
+  # This is the key fix: Linux ext4 filesystem inside Docker, no NTFS locking.
   php_var:
+  php_uploads:
 
 networks:
   eventhub:

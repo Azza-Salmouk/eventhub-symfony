@@ -52,6 +52,7 @@
                         <th class="py-3 text-muted small fw-semibold text-uppercase">Event</th>
                         <th class="py-3 text-muted small fw-semibold text-uppercase">Event Date</th>
                         <th class="pe-4 py-3 text-muted small fw-semibold text-uppercase">Reserved On</th>
+                        <th class="pe-4 py-3 text-muted small fw-semibold text-uppercase">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -85,10 +86,24 @@
                             </td>
                             <td class="small text-muted">{{ r.event.date|date('M j, Y') }}</td>
                             <td class="pe-4 small text-muted">{{ r.createdAt|date('M j, Y · g:i A') }}</td>
+                            <td class="pe-4">
+                                <form method="post"
+                                      action="{{ path('app_admin_reservation_resend_email', {id: r.id}) }}"
+                                      data-turbo="false"
+                                      onsubmit="return confirm('Resend confirmation email to {{ r.email|e('js') }}?')">
+                                    <input type="hidden" name="_token"
+                                           value="{{ csrf_token('resend_email_' ~ r.id) }}">
+                                    <button type="submit"
+                                            class="btn btn-sm btn-outline-primary"
+                                            title="Resend confirmation email">
+                                        <i class="bi bi-envelope-arrow-up me-1"></i>Resend
+                                    </button>
+                                </form>
+                            </td>
                         </tr>
                     {% else %}
                         <tr>
-                            <td colspan="6" class="text-center py-5">
+                            <td colspan="7" class="text-center py-5">
                                 <i class="bi bi-ticket-perforated text-muted" style="font-size:2.5rem"></i>
                                 <p class="text-muted mt-3 mb-0">No reservations found.</p>
                             </td>
