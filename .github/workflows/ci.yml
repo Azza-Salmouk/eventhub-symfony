@@ -12,33 +12,49 @@ jobs:
     runs-on: ubuntu-latest
 
     strategy:
+      fail-fast: false
       matrix:
-        php: ['8.4', '8.5']
+        php: ['8.4']   # 8.5 is not yet available on shivammathur/setup-php
 
     services:
       mysql:
         image: mysql:8.0
         env:
           MYSQL_ROOT_PASSWORD: root
-          MYSQL_DATABASE: eventhub_test
+          MYSQL_DATABASE: eventhub_ci
         ports:
           - 3306:3306
         options: >-
-          --health-cmd="mysqladmin ping -h localhost -u root -proot"
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -u root -proot"
           --health-interval=10s
           --health-timeout=5s
-          --health-retries=10
+          --health-retries=15
+          --health-start-period=30s
+
+    # ── All CI env vars in one place ─────────────────────────────────────────
+    env:
+      APP_ENV: dev
+      APP_SECRET: ci_secret_32chars_aaaaaaaaaaaaaaaa
+      DATABASE_URL: "mysql://root:root@127.0.0.1:3306/eventhub_ci?serverVersion=8.0&charset=utf8mb4"
+      MESSENGER_TRANSPORT_DSN: "doctrine://default?auto_setup=0"
+      MAILER_DSN: "null://null"
+      MAILER_FROM_EMAIL: "ci@eventhub.com"
+      MAILER_FROM_NAME: "EventHub CI"
+      JWT_SECRET_KEY: "%kernel.project_dir%/config/jwt/private.pem"
+      JWT_PUBLIC_KEY: "%kernel.project_dir%/config/jwt/public.pem"
+      JWT_PASSPHRASE: "ci_jwt_passphrase_for_testing_only"
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup PHP
+      - name: Setup PHP ${{ matrix.php }}
         uses: shivammathur/setup-php@v2
         with:
           php-version: ${{ matrix.php }}
           extensions: pdo_mysql, intl, opcache, zip, mbstring, openssl
           coverage: none
+          ini-values: memory_limit=256M
 
       - name: Display PHP version
         run: php -v
@@ -46,13 +62,37 @@ jobs:
       - name: Validate composer.json
         run: composer validate --strict
 
+      - name: Cache Composer packages
+        uses: actions/cache@v4
+        with:
+          path: vendor
+          key: composer-${{ matrix.php }}-${{ hashFiles('composer.lock') }}
+          restore-keys: composer-${{ matrix.php }}-
+
       - name: Install dependencies
-        run: composer install --prefer-dist --no-progress --no-interaction --ignore-platform-req=ext-sodium
+        run: |
+          composer install \
+            --prefer-dist \
+            --no-progress \
+            --no-interaction \
+            --ignore-platform-req=ext-sodium
 
       - name: Generate JWT keypair
+        # Uses the CI passphrase — must match JWT_PASSPHRASE env var above
         run: |
           mkdir -p config/jwt
-          php generate_keys.php
+          JWT_PASSPHRASE=ci_jwt_passphrase_for_testing_only php -r "
+            \$passphrase = getenv('JWT_PASSPHRASE');
+            \$config = ['private_key_bits' => 2048, 'private_key_type' => OPENSSL_KEYTYPE_RSA];
+            \$res = openssl_pkey_new(\$config);
+            if (!\$res) { echo 'openssl_pkey_new failed'; exit(1); }
+            openssl_pkey_export(\$res, \$priv, \$passphrase);
+            if (!\$priv) { echo 'openssl_pkey_export failed'; exit(1); }
+            file_put_contents('config/jwt/private.pem', \$priv);
+            \$pub = openssl_pkey_get_details(\$res)['key'];
+            file_put_contents('config/jwt/public.pem', \$pub);
+            echo 'JWT keys generated OK' . PHP_EOL;
+          "
 
       - name: Lint YAML config
         run: php bin/console lint:yaml config/
@@ -60,33 +100,25 @@ jobs:
       - name: Lint Twig templates
         run: php bin/console lint:twig templates/
 
-      - name: Check Symfony container
-        run: php bin/console debug:container --no-interaction 2>&1 | tail -5
+      - name: Check Symfony container wires correctly
+        run: php bin/console debug:container --no-interaction 2>&1 | tail -3
+
+      - name: Wait for MySQL to be ready
+        run: |
+          for i in $(seq 1 30); do
+            mysqladmin ping -h 127.0.0.1 -u root -proot --silent && break
+            echo "Waiting for MySQL... ($i/30)"
+            sleep 2
+          done
 
       - name: Run database migrations
-        env:
-          DATABASE_URL: "mysql://root:root@127.0.0.1:3306/eventhub_test?serverVersion=8.0&charset=utf8mb4"
-          APP_SECRET: ci_test_secret_32chars_minimum_ok
-          JWT_SECRET_KEY: "%kernel.project_dir%/config/jwt/private.pem"
-          JWT_PUBLIC_KEY: "%kernel.project_dir%/config/jwt/public.pem"
-          JWT_PASSPHRASE: ci_test_passphrase
-        run: |
-          php bin/console doctrine:migrations:migrate --no-interaction --env=test
+        run: php bin/console doctrine:migrations:migrate --no-interaction
 
       - name: Validate Doctrine schema
-        env:
-          DATABASE_URL: "mysql://root:root@127.0.0.1:3306/eventhub_test?serverVersion=8.0&charset=utf8mb4"
-          APP_SECRET: ci_test_secret_32chars_minimum_ok
-          JWT_SECRET_KEY: "%kernel.project_dir%/config/jwt/private.pem"
-          JWT_PUBLIC_KEY: "%kernel.project_dir%/config/jwt/public.pem"
-          JWT_PASSPHRASE: ci_test_passphrase
-        run: php bin/console doctrine:schema:validate --env=test
+        run: php bin/console doctrine:schema:validate
+
+      - name: Load fixtures
+        run: php bin/console doctrine:fixtures:load --no-interaction
 
       - name: Run PHPUnit tests
-        env:
-          DATABASE_URL: "mysql://root:root@127.0.0.1:3306/eventhub_test?serverVersion=8.0&charset=utf8mb4"
-          APP_SECRET: ci_test_secret_32chars_minimum_ok
-          JWT_SECRET_KEY: "%kernel.project_dir%/config/jwt/private.pem"
-          JWT_PUBLIC_KEY: "%kernel.project_dir%/config/jwt/public.pem"
-          JWT_PASSPHRASE: ci_test_passphrase
         run: php bin/phpunit --no-coverage 2>&1 || echo "No tests found — skipping"
